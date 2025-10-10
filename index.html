@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student ID Card Generator</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- HTML2Canvas for capturing DOM as image -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- jsPDF for generating PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        /* Custom styles for the ID card to ensure exact dimensions and professional look */
+        .id-card-container {
+            width: 3.375in; /* Standard landscape ID card width */
+            height: 2.125in; /* Standard landscape ID card height */
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: row;
+            background-color: white;
+        }
+
+        .photo-section {
+            width: 30%;
+            height: 100%;
+            flex-shrink: 0;
+        }
+
+        .photo-section img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .info-section {
+            width: 70%;
+            padding: 0.1in;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Address field specific styling */
+        #cardAddress {
+            word-wrap: break-word;
+            word-break: break-word;
+            hyphens: auto;
+            line-height: 1.1;
+            min-height: 1.5em;
+        }
+        
+        /* Hide the default file input text */
+        input[type="file"] {
+            color: transparent;
+        }
+
+        /* Style for the 3D "ghost" buttons */
+        .modern-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 12px;
+            cursor: pointer;
+            display: inline-block;
+            text-align: center;
+            font-size: 0.875rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: none;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .modern-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .modern-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 35px rgba(102, 126, 234, 0.4);
+        }
+
+        .modern-button:hover::before {
+            left: 100%;
+        }
+        
+        .modern-button:active {
+            transform: translateY(0);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        /* Custom modal for messages */
+        .custom-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 1000;
+            text-align: center;
+            color: #333;
+            display: none; /* Hidden by default */
+        }
+        
+        .custom-modal.show {
+            display: block;
+        }
+
+        .custom-modal.success {
+            border: 2px solid #28a745;
+            color: #28a745;
+        }
+
+        .custom-modal.error {
+            border: 2px solid #dc3545;
+            color: #dc3545;
+        }
+
+        /* Enhanced input styling */
+        input[type="text"] {
+            transition: all 0.3s ease;
+            border: 2px solid #e5e7eb;
+        }
+
+        input[type="text"]:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            transform: translateY(-1px);
+        }
+
+        /* Social media links styling */
+        .social-links {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            z-index: 100;
+        }
+
+        .social-link {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .social-link.facebook {
+            background: linear-gradient(135deg, #1877f2, #42a5f5);
+            color: white;
+        }
+
+        .social-link.github {
+            background: linear-gradient(135deg, #333, #555);
+            color: white;
+        }
+
+        .social-link:hover {
+            transform: translateY(-3px) scale(1.1);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        .social-link svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        /* Enhanced card container */
+        .main-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        /* Enhanced section styling */
+        .section-title {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 800;
+        }
+
+        /* Mobile Responsive Improvements */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            
+            .main-container {
+                margin: 0;
+                border-radius: 15px;
+                max-width: 100%;
+            }
+            
+            .section-title {
+                font-size: 1.5rem;
+                margin-bottom: 1rem;
+            }
+            
+            /* Mobile layout adjustments */
+            .flex-col.lg\:flex-row {
+                flex-direction: column;
+            }
+            
+            .w-full.lg\:w-1\/2 {
+                width: 100%;
+                padding: 1rem;
+            }
+            
+            /* Mobile input styling */
+            input[type="text"] {
+                font-size: 16px; /* Prevents zoom on iOS */
+                padding: 12px;
+                margin-bottom: 8px;
+            }
+            
+            /* Mobile button adjustments */
+            .modern-button {
+                padding: 12px 20px;
+                font-size: 14px;
+                width: 100%;
+                margin-top: 8px;
+            }
+            
+            /* Mobile card preview */
+            .id-card-container {
+                transform: scale(0.8);
+                margin: 20px 0;
+            }
+            
+            /* Mobile social links */
+            .social-links {
+                bottom: 15px;
+                gap: 12px;
+            }
+            
+            .social-link {
+                width: 45px;
+                height: 45px;
+            }
+            
+            .social-link svg {
+                width: 20px;
+                height: 20px;
+            }
+            
+            /* Mobile grid adjustments */
+            .grid.grid-cols-1.md\:grid-cols-2 {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+            
+            /* Mobile spacing */
+            .space-y-4 > * + * {
+                margin-top: 12px;
+            }
+            
+            /* Mobile border adjustments */
+            .border-r.border-gray-200 {
+                border-right: none;
+                border-bottom: 1px solid #e5e7eb;
+                padding-bottom: 1rem;
+                margin-bottom: 1rem;
+            }
+        }
+
+        /* Extra small mobile devices */
+        @media (max-width: 480px) {
+            .section-title {
+                font-size: 1.25rem;
+            }
+            
+            .id-card-container {
+                transform: scale(0.7);
+            }
+            
+            .social-links {
+                bottom: 10px;
+                gap: 10px;
+            }
+            
+            .social-link {
+                width: 40px;
+                height: 40px;
+            }
+            
+            .social-link svg {
+                width: 18px;
+                height: 18px;
+            }
+            
+            input[type="text"] {
+                padding: 10px;
+                font-size: 14px;
+            }
+            
+            .modern-button {
+                padding: 10px 16px;
+                font-size: 13px;
+            }
+        }
+
+        /* Landscape mobile orientation */
+        @media (max-width: 768px) and (orientation: landscape) {
+            .id-card-container {
+                transform: scale(0.6);
+            }
+            
+            .social-links {
+                bottom: 8px;
+            }
+            
+            .main-container {
+                max-height: 95vh;
+                overflow-y: auto;
+            }
+        }
+
+        /* Disclaimer Notice Styling */
+        .disclaimer-notice {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            color: white;
+            padding: 12px 20px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 14px;
+            z-index: 1000;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            animation: pulse 2s infinite;
+        }
+
+        .disclaimer-notice .warning-icon {
+            display: inline-block;
+            margin-right: 8px;
+            font-size: 16px;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.8; }
+            100% { opacity: 1; }
+        }
+
+        /* Adjust body padding to account for fixed notice */
+        body.with-notice {
+            padding-top: 60px;
+        }
+
+        /* Mobile disclaimer adjustments */
+        @media (max-width: 768px) {
+            .disclaimer-notice {
+                padding: 10px 15px;
+                font-size: 12px;
+                line-height: 1.4;
+            }
+            
+            body.with-notice {
+                padding-top: 50px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .disclaimer-notice {
+                padding: 8px 12px;
+                font-size: 11px;
+            }
+            
+            body.with-notice {
+                padding-top: 45px;
+            }
+        }
+
+        /* GitHub Star Popup Styling */
+        .github-popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.8);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 
+                0 25px 50px rgba(0, 0, 0, 0.3),
+                0 0 0 1px rgba(255, 255, 255, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            z-index: 2000;
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .github-popup.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        .github-popup .close-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .github-popup .close-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.1);
+        }
+
+        .github-popup .star-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+            animation: starPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes starPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .github-popup h3 {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .github-popup p {
+            font-size: 16px;
+            margin-bottom: 25px;
+            opacity: 0.9;
+            line-height: 1.5;
+        }
+
+        .github-popup .star-button {
+            background: linear-gradient(135deg, #ffd700, #ffed4e);
+            color: #333;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 25px rgba(255, 215, 0, 0.3);
+            text-decoration: none;
+            display: inline-block;
+            margin-right: 10px;
+        }
+
+        .github-popup .star-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 35px rgba(255, 215, 0, 0.4);
+        }
+
+        .github-popup .later-btn {
+            background: transparent;
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .github-popup .later-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+
+        /* Popup overlay */
+        .popup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1999;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(5px);
+        }
+
+        .popup-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Mobile responsive popup */
+        @media (max-width: 768px) {
+            .github-popup {
+                padding: 25px 20px;
+                max-width: 350px;
+            }
+            
+            .github-popup h3 {
+                font-size: 20px;
+            }
+            
+            .github-popup p {
+                font-size: 14px;
+            }
+            
+            .github-popup .star-icon {
+                font-size: 40px;
+            }
+        }
+
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4 with-notice">
+    <!-- Disclaimer Notice -->
+    <div class="disclaimer-notice">
+        <span class="warning-icon">⚠️</span>
+        <strong>DISCLAIMER:</strong> This is a FAKE/DEMO ID Card Generator for educational and demonstration purposes only. 
+        The generated cards are NOT REAL and should NOT be used for any illegal activities or to impersonate real institutions. 
+        This tool is created for learning purposes and has no connection to any real organization. 
+        Please do not use these cards for fraudulent purposes.
+    </div>
+
+    <!-- GitHub Star Popup -->
+    <div class="popup-overlay" id="popupOverlay"></div>
+    <div class="github-popup" id="githubPopup">
+        <button class="close-btn" id="closePopup">×</button>
+        <div class="star-icon">⭐</div>
+        <h3>Love this project?</h3>
+        <p>If you find this ID Card Generator useful, please consider giving it a star on GitHub! It helps others discover this tool and motivates us to keep improving it.</p>
+        <a href="https://github.com/Moajjem404" target="_blank" class="star-button" id="starButton">
+            ⭐ Star on GitHub
+        </a>
+        <button class="later-btn" id="laterButton">Maybe Later</button>
+    </div>
+    
+    <div class="flex flex-col lg:flex-row main-container overflow-hidden w-full max-w-6xl">
+        <!-- Left Panel: Edit Area -->
+        <div class="w-full lg:w-1/2 p-4 md:p-8 space-y-4 border-r border-gray-200 overflow-y-auto" style="max-height: 90vh;">
+            <h2 class="text-3xl font-bold section-title mb-4 text-center">ID Card Editor</h2>
+
+            <!-- Upload Option -->
+            <div class="border-b pb-4">
+                <label class="block text-sm font-medium text-gray-700">Upload Student Photo</label>
+                <label for="studentPhotoUpload" class="modern-button mt-2">Choose File</label>
+                <input type="file" id="studentPhotoUpload" accept="image/*" class="hidden">
+            </div>
+
+            <!-- Text Fields -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label for="universityNameInput" class="block text-sm font-medium text-gray-700">University Name:</label>
+                    <input type="text" id="universityNameInput" value="Sylhet Polytechnic Institute" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                </div>
+                 <div>
+                    <label for="nameInput" class="block text-sm font-medium text-gray-700">Student Name:</label>
+                    <input type="text" id="nameInput" value="Moajjem Hossen" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                </div>
+                 <div>
+                    <label for="dobInput" class="block text-sm font-medium text-gray-700">Date of Birth:</label>
+                    <input type="text" id="dobInput" value="March 10 2004" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                </div>
+                 <div>
+                    <label for="studentIdInput" class="block text-sm font-medium text-gray-700">Student ID:</label>
+                    <input type="text" id="studentIdInput" value="8899-9619" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                </div>
+                 <div>
+                    <label for="phoneInput" class="block text-sm font-medium text-gray-700">Phone:</label>
+                    <input type="text" id="phoneInput" value="+880 179658452*" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                </div>
+                 <div>
+                    <label for="academicYearInput" class="block text-sm font-medium text-gray-700">Academic Year:</label>
+                    <input type="text" id="academicYearInput" value="2025" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                </div>
+                <div class="md:col-span-2">
+                    <label for="addressInput" class="block text-sm font-medium text-gray-700">Address:</label>
+                    <input type="text" id="addressInput" value="Technical Road, Sylhet-3100" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel: Live Card View -->
+        <div class="w-full lg:w-1/2 p-4 md:p-8 flex flex-col items-center justify-center bg-gray-200 relative">
+            <h2 class="text-3xl font-bold section-title mb-6 text-center">Live ID Card Preview</h2>
+
+            <!-- ID Card Preview Area -->
+            <div id="idCardPreview" class="id-card-container shadow-lg">
+                <!-- Photo Section -->
+                <div class="photo-section">
+                    <img id="cardStudentPhoto" src="https://placehold.co/252x324/BFDBFE/374151?text=PHOTO" alt="Student Photo" onerror="this.onerror=null;this.src='https://placehold.co/252x324/BFDBFE/374151?text=PHOTO';">
+                </div>
+                <!-- Info Section -->
+                <div class="info-section">
+                    <div class="flex items-center gap-2">
+                        <svg class="w-8 h-8 text-gray-700" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L1 7.5V13.75C1 18.31 4.21 22.5 12 24C19.79 22.5 23 18.31 23 13.75V7.5L12 2ZM12 4.3L19.92 8.5L12 12.7L4.08 8.5L12 4.3ZM5 14.5C5 15.8 5.75 16.95 7 17.65V15.5H9V19.5C6.2 18.88 5 16.81 5 14.5Z M15 19.5V15.5H17V17.65C18.25 16.95 19 15.8 19 14.5C19 12.19 15.8 10.12 12 10.12C8.2 10.12 5 12.19 5 14.5H3C3 11.12 7.5 8.5 12 8.5C16.5 8.5 21 11.12 21 14.5C21 17.5 17.8 20.1 15 20.8V19.5Z"/></svg>
+                        <p id="cardUniversityName" class="font-semibold text-gray-700 text-[10px] leading-tight"></p>
+                    </div>
+                    
+                    <p class="text-[14px] font-bold text-orange-600 mt-2 tracking-wider">STUDENT ID CARD</p>
+                    <p id="cardName" class="text-[16px] font-extrabold text-black mt-1"></p>
+
+                    <hr class="my-2 border-gray-300">
+
+                    <div class="grid grid-cols-2 gap-x-2 gap-y-1 text-[8px] flex-grow">
+                        <div>
+                            <p class="text-gray-500 font-semibold tracking-wider">DATE OF BIRTH</p>
+                            <p id="cardDob" class="text-black font-medium"></p>
+                        </div>
+                        <div>
+                            <p class="text-gray-500 font-semibold tracking-wider">STUDENT ID</p>
+                            <p id="cardStudentId" class="text-black font-medium"></p>
+                        </div>
+                        <div>
+                            <p class="text-gray-500 font-semibold tracking-wider">PHONE</p>
+                            <p id="cardPhone" class="text-black font-medium"></p>
+                        </div>
+                        <div class="col-span-1">
+                            <p class="text-gray-500 font-semibold tracking-wider">ADDRESS</p>
+                            <p id="cardAddress" class="text-black font-medium leading-tight text-[7px] break-words"></p>
+                        </div>
+                    </div>
+                    
+                    <div class="text-[8px] mt-auto">
+                        <p class="text-gray-500 font-semibold tracking-wider">CURRENT ACADEMIC YEAR</p>
+                        <p id="cardAcademicYear" class="text-black font-medium"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Download Button -->
+            <button id="downloadCardButton" class="modern-button mt-8">
+                Download Card
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // GitHub Star Popup functionality
+        function showGitHubPopup() {
+            const popup = document.getElementById('githubPopup');
+            const overlay = document.getElementById('popupOverlay');
+            
+            popup.classList.add('show');
+            overlay.classList.add('show');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function hideGitHubPopup() {
+            const popup = document.getElementById('githubPopup');
+            const overlay = document.getElementById('popupOverlay');
+            
+            popup.classList.remove('show');
+            overlay.classList.remove('show');
+            document.body.style.overflow = 'auto';
+            
+            // Mark as seen in localStorage
+            localStorage.setItem('githubPopupSeen', 'true');
+        }
+
+        // Check if popup should be shown
+        function checkGitHubPopup() {
+            const popupSeen = localStorage.getItem('githubPopupSeen');
+            if (!popupSeen) {
+                // Show popup after a short delay
+                setTimeout(showGitHubPopup, 2000);
+            }
+        }
+
+        // Function to show a custom modal message
+        function showMessage(message, type = 'info') {
+            const existingModal = document.querySelector('.custom-modal');
+            if (existingModal) existingModal.remove();
+
+            const modal = document.createElement('div');
+            modal.className = `custom-modal ${type}`;
+            modal.textContent = message;
+            document.body.appendChild(modal);
+            
+            setTimeout(() => modal.classList.add('show'), 10);
+            setTimeout(() => {
+                modal.classList.remove('show');
+                setTimeout(() => modal.remove(), 500);
+            }, 3000);
+        }
+
+        // Function to handle image uploads
+        function handleImageUpload(event, targetElementId) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    document.getElementById(targetElementId).src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // Generic function to update text fields on the card
+        function updateCardField(inputId, cardElementId) {
+            const inputElement = document.getElementById(inputId);
+            const cardElement = document.getElementById(cardElementId);
+            
+            const update = () => cardElement.textContent = inputElement.value;
+            
+            update(); // Initial update
+            inputElement.addEventListener('input', update);
+        }
+
+        // Initialize all fields and listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            // Image upload listener
+            document.getElementById('studentPhotoUpload').addEventListener('change', (e) => handleImageUpload(e, 'cardStudentPhoto'));
+
+            // Text field listeners
+            updateCardField('universityNameInput', 'cardUniversityName');
+            updateCardField('nameInput', 'cardName');
+            updateCardField('dobInput', 'cardDob');
+            updateCardField('studentIdInput', 'cardStudentId');
+            updateCardField('phoneInput', 'cardPhone');
+            updateCardField('addressInput', 'cardAddress');
+            updateCardField('academicYearInput', 'cardAcademicYear');
+
+            // GitHub popup event listeners
+            document.getElementById('closePopup').addEventListener('click', hideGitHubPopup);
+            document.getElementById('laterButton').addEventListener('click', hideGitHubPopup);
+            document.getElementById('popupOverlay').addEventListener('click', hideGitHubPopup);
+            
+            // Star button click tracking
+            document.getElementById('starButton').addEventListener('click', () => {
+                // Track that user clicked star button
+                localStorage.setItem('githubStarClicked', 'true');
+                hideGitHubPopup();
+            });
+
+            // Check if GitHub popup should be shown
+            checkGitHubPopup();
+        });
+
+        // Download functionality
+        document.getElementById('downloadCardButton').addEventListener('click', async () => {
+            const card = document.getElementById('idCardPreview');
+            const scaleFactor = 4; // Higher scale for better quality
+
+            try {
+                showMessage("Generating your card...", "info");
+
+                const canvas = await html2canvas(card, {
+                    scale: scaleFactor,
+                    useCORS: true,
+                    logging: false,
+                    width: card.offsetWidth,
+                    height: card.offsetHeight
+                });
+
+                const studentName = document.getElementById('nameInput').value.replace(/ /g, '_') || 'student';
+
+                // --- PNG Download ---
+                const pngUrl = canvas.toDataURL('image/png');
+                const pngLink = document.createElement('a');
+                pngLink.href = pngUrl;
+                pngLink.download = `${studentName}_id_card.png`;
+                document.body.appendChild(pngLink);
+                pngLink.click();
+                document.body.removeChild(pngLink);
+                
+                // --- PDF Download ---
+                const { jsPDF } = window.jspdf;
+                // Card dimensions in mm: 3.375in = 85.7mm, 2.125in = 54mm
+                const pdfWidth = 85.7;
+                const pdfHeight = 54;
+
+                const pdf = new jsPDF({
+                    orientation: 'landscape',
+                    unit: 'mm',
+                    format: [pdfWidth, pdfHeight]
+                });
+
+                pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pdfWidth, pdfHeight);
+                pdf.save(`${studentName}_id_card.pdf`);
+                
+                setTimeout(() => {
+                    showMessage("Card downloaded as PNG and PDF!", "success");
+                }, 500);
+
+            } catch (error) {
+                console.error("Error generating card:", error);
+                showMessage("Failed to generate card. Check console for errors.", "error");
+            }
+        });
+    </script>
+
+    <!-- Social Media Links -->
+    <div class="social-links">
+        <a href="https://www.facebook.com/Md.Moajjem.Hossen404/" target="_blank" class="social-link facebook" title="Follow us on Facebook">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+            </svg>
+        </a>
+        <a href="https://github.com/Moajjem404" target="_blank" class="social-link github" title="Check out our GitHub">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+            </svg>
+        </a>
+    </div>
+</body>
+</html>
+
+
