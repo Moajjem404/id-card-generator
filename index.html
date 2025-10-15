@@ -251,10 +251,14 @@
                 margin-top: 8px;
             }
             
-            /* Mobile card preview */
+            /* Mobile card preview - ensure proper scaling for download */
             .id-card-container {
                 transform: scale(0.8);
                 margin: 20px 0;
+                /* Ensure the card maintains its aspect ratio on mobile */
+                transform-origin: center;
+                /* Add some padding to prevent clipping during canvas capture */
+                padding: 2px;
             }
             
             /* Mobile social links */
@@ -786,26 +790,265 @@
             checkGitHubPopup();
         });
 
-        // Download functionality
+        // Function to ensure proper rendering before capture
+        function ensureProperRendering(card) {
+            return new Promise((resolve) => {
+                // Force a reflow to ensure all elements are properly rendered
+                card.offsetHeight;
+                
+                // Wait for any pending images to load
+                const images = card.querySelectorAll('img');
+                let loadedImages = 0;
+                
+                if (images.length === 0) {
+                    resolve();
+                    return;
+                }
+                
+                const checkImages = () => {
+                    loadedImages++;
+                    if (loadedImages === images.length) {
+                        // Additional delay for mobile devices to ensure proper rendering
+                        setTimeout(resolve, 200);
+                    }
+                };
+                
+                images.forEach(img => {
+                    if (img.complete) {
+                        checkImages();
+                    } else {
+                        img.onload = checkImages;
+                        img.onerror = checkImages;
+                    }
+                });
+            });
+        }
+
+        // Mobile-specific rendering function
+        function renderForMobile(card) {
+            return new Promise((resolve) => {
+                // Create a temporary container with the card content
+                const tempContainer = document.createElement('div');
+                tempContainer.style.position = 'absolute';
+                tempContainer.style.left = '-9999px';
+                tempContainer.style.top = '0';
+                tempContainer.style.width = card.offsetWidth + 'px';
+                tempContainer.style.height = card.offsetHeight + 'px';
+                tempContainer.style.backgroundColor = '#ffffff';
+                tempContainer.style.transform = 'scale(1)';
+                tempContainer.style.transformOrigin = 'top left';
+                
+                // Clone the card content
+                const clonedCard = card.cloneNode(true);
+                clonedCard.style.transform = 'none';
+                clonedCard.style.position = 'static';
+                clonedCard.style.margin = '0';
+                clonedCard.style.padding = '0';
+                
+                tempContainer.appendChild(clonedCard);
+                document.body.appendChild(tempContainer);
+                
+                // Wait for rendering
+                setTimeout(() => {
+                    resolve(tempContainer);
+                }, 300);
+            });
+        }
+
+        // Alternative mobile rendering using SVG fallback
+        function createSVGCard() {
+            const card = document.getElementById('idCardPreview');
+            const cardWidth = card.offsetWidth;
+            const cardHeight = card.offsetHeight;
+            
+            // Get all text content
+            const universityName = document.getElementById('cardUniversityName').textContent;
+            const studentName = document.getElementById('cardName').textContent;
+            const dob = document.getElementById('cardDob').textContent;
+            const studentId = document.getElementById('cardStudentId').textContent;
+            const phone = document.getElementById('cardPhone').textContent;
+            const address = document.getElementById('cardAddress').textContent;
+            const academicYear = document.getElementById('cardAcademicYear').textContent;
+            
+            // Get photo data
+            const photoImg = document.getElementById('cardStudentPhoto');
+            let photoData = '';
+            if (photoImg.src && !photoImg.src.includes('placehold')) {
+                photoData = photoImg.src;
+            }
+            
+            // Create SVG
+            const svg = `
+                <svg width="${cardWidth}" height="${cardHeight}" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <style>
+                            .university-text { font-family: Arial, sans-serif; font-size: 10px; font-weight: 600; fill: #374151; }
+                            .title-text { font-family: Arial, sans-serif; font-size: 14px; font-weight: bold; fill: #ea580c; }
+                            .name-text { font-family: Arial, sans-serif; font-size: 16px; font-weight: 800; fill: #000000; }
+                            .label-text { font-family: Arial, sans-serif; font-size: 8px; font-weight: 600; fill: #6b7280; }
+                            .value-text { font-family: Arial, sans-serif; font-size: 8px; font-weight: 500; fill: #000000; }
+                            .address-text { font-family: Arial, sans-serif; font-size: 7px; font-weight: 500; fill: #000000; }
+                        </style>
+                    </defs>
+                    <rect width="100%" height="100%" fill="white" stroke="#e5e7eb" stroke-width="1"/>
+                    <rect x="0" y="0" width="${cardWidth * 0.3}" height="100%" fill="#f3f4f6"/>
+                    ${photoData ? `<image x="0" y="0" width="${cardWidth * 0.3}" height="100%" href="${photoData}" preserveAspectRatio="xMidYMid slice"/>` : ''}
+                    <text x="${cardWidth * 0.35}" y="20" class="university-text">${universityName}</text>
+                    <text x="${cardWidth * 0.35}" y="40" class="title-text">STUDENT ID CARD</text>
+                    <text x="${cardWidth * 0.35}" y="60" class="name-text">${studentName}</text>
+                    <line x1="${cardWidth * 0.35}" y1="70" x2="${cardWidth * 0.95}" y2="70" stroke="#d1d5db" stroke-width="1"/>
+                    <text x="${cardWidth * 0.35}" y="85" class="label-text">DATE OF BIRTH</text>
+                    <text x="${cardWidth * 0.35}" y="95" class="value-text">${dob}</text>
+                    <text x="${cardWidth * 0.6}" y="85" class="label-text">STUDENT ID</text>
+                    <text x="${cardWidth * 0.6}" y="95" class="value-text">${studentId}</text>
+                    <text x="${cardWidth * 0.35}" y="110" class="label-text">PHONE</text>
+                    <text x="${cardWidth * 0.35}" y="120" class="value-text">${phone}</text>
+                    <text x="${cardWidth * 0.6}" y="110" class="label-text">ADDRESS</text>
+                    <text x="${cardWidth * 0.6}" y="120" class="address-text">${address}</text>
+                    <text x="${cardWidth * 0.35}" y="140" class="label-text">CURRENT ACADEMIC YEAR</text>
+                    <text x="${cardWidth * 0.35}" y="150" class="value-text">${academicYear}</text>
+                </svg>
+            `;
+            
+            return svg;
+        }
+
+        // Download functionality with mobile optimization
         document.getElementById('downloadCardButton').addEventListener('click', async () => {
             const card = document.getElementById('idCardPreview');
-            const scaleFactor = 4; // Higher scale for better quality
+            
+            // Detect if device is mobile
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                            window.innerWidth <= 768 || 
+                            ('ontouchstart' in window);
+            
+            // Calculate optimal scale factor based on device
+            let scaleFactor;
+            if (isMobile) {
+                // For mobile devices, use device pixel ratio with a minimum scale
+                scaleFactor = Math.max(window.devicePixelRatio || 1, 2);
+                // Cap the scale factor to prevent memory issues on low-end devices
+                scaleFactor = Math.min(scaleFactor, 3);
+            } else {
+                // For desktop, use higher scale for better quality
+                scaleFactor = 4;
+            }
 
             try {
                 showMessage("Generating your card...", "info");
 
-                const canvas = await html2canvas(card, {
+                let targetElement = card;
+                let tempContainer = null;
+
+                if (isMobile) {
+                    // Use mobile-specific rendering
+                    tempContainer = await renderForMobile(card);
+                    targetElement = tempContainer;
+                } else {
+                    // Ensure proper rendering before capture for desktop
+                    await ensureProperRendering(card);
+                }
+
+                // Canvas configuration
+                const canvasOptions = {
                     scale: scaleFactor,
                     useCORS: true,
                     logging: false,
-                    width: card.offsetWidth,
-                    height: card.offsetHeight
-                });
+                    width: targetElement.offsetWidth,
+                    height: targetElement.offsetHeight,
+                    backgroundColor: '#ffffff',
+                    allowTaint: true,
+                    foreignObjectRendering: false
+                };
+
+                // Add mobile-specific options
+                if (isMobile) {
+                    canvasOptions.scrollX = 0;
+                    canvasOptions.scrollY = 0;
+                    canvasOptions.x = 0;
+                    canvasOptions.y = 0;
+                    canvasOptions.windowWidth = window.innerWidth;
+                    canvasOptions.windowHeight = window.innerHeight;
+                }
+
+                let canvas;
+                let useSVGFallback = false;
+
+                try {
+                    canvas = await html2canvas(targetElement, canvasOptions);
+
+                    // Clean up temporary container if created
+                    if (tempContainer) {
+                        document.body.removeChild(tempContainer);
+                    }
+
+                    // Check if canvas is valid (not black/empty)
+                    const ctx = canvas.getContext('2d');
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const data = imageData.data;
+                    let hasContent = false;
+                    
+                    // Check if there's any non-transparent content
+                    for (let i = 0; i < data.length; i += 4) {
+                        if (data[i + 3] > 0) { // Alpha channel > 0
+                            hasContent = true;
+                            break;
+                        }
+                    }
+
+                    if (!hasContent && isMobile) {
+                        // Use SVG fallback for mobile
+                        useSVGFallback = true;
+                    } else if (!hasContent) {
+                        showMessage("Error: Card appears to be empty. Please try again.", "error");
+                        return;
+                    }
+                } catch (error) {
+                    if (isMobile) {
+                        // Use SVG fallback for mobile
+                        useSVGFallback = true;
+                    } else {
+                        throw error;
+                    }
+                }
 
                 const studentName = document.getElementById('nameInput').value.replace(/ /g, '_') || 'student';
 
+                if (useSVGFallback) {
+                    // Create SVG-based card for mobile
+                    const svgString = createSVGCard();
+                    const svgBlob = new Blob([svgString], { type: 'image/svg+xml' });
+                    const svgUrl = URL.createObjectURL(svgBlob);
+                    
+                    // Convert SVG to canvas
+                    const img = new Image();
+                    img.onload = () => {
+                        canvas = document.createElement('canvas');
+                        canvas.width = card.offsetWidth;
+                        canvas.height = card.offsetHeight;
+                        const ctx = canvas.getContext('2d');
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        ctx.drawImage(img, 0, 0);
+                        URL.revokeObjectURL(svgUrl);
+                        downloadFiles(canvas, studentName);
+                    };
+                    img.src = svgUrl;
+                    return;
+                }
+
+                downloadFiles(canvas, studentName);
+            } catch (error) {
+                console.error("Error generating card:", error);
+                showMessage("Failed to generate card. Please try again.", "error");
+            }
+        });
+
+        // Separate function for downloading files
+        function downloadFiles(canvas, studentName) {
+            try {
                 // --- PNG Download ---
-                const pngUrl = canvas.toDataURL('image/png');
+                const pngUrl = canvas.toDataURL('image/png', 1.0); // Maximum quality
                 const pngLink = document.createElement('a');
                 pngLink.href = pngUrl;
                 pngLink.download = `${studentName}_id_card.png`;
@@ -825,18 +1068,19 @@
                     format: [pdfWidth, pdfHeight]
                 });
 
-                pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pdfWidth, pdfHeight);
+                // Use high quality image for PDF
+                const imageDataForPdf = canvas.toDataURL('image/png', 1.0);
+                pdf.addImage(imageDataForPdf, 'PNG', 0, 0, pdfWidth, pdfHeight);
                 pdf.save(`${studentName}_id_card.pdf`);
                 
                 setTimeout(() => {
                     showMessage("Card downloaded as PNG and PDF!", "success");
                 }, 500);
-
             } catch (error) {
-                console.error("Error generating card:", error);
-                showMessage("Failed to generate card. Check console for errors.", "error");
+                console.error("Error downloading files:", error);
+                showMessage("Error downloading files. Please try again.", "error");
             }
-        });
+        }
     </script>
 
     <!-- Social Media Links -->
